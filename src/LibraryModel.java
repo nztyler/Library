@@ -9,6 +9,8 @@
 import javax.swing.*;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
 
 public class LibraryModel {
 
@@ -27,8 +29,42 @@ public class LibraryModel {
         }
     }
 
+    /**
+     * Shows the books and authors
+     * @param isbn
+     * @return
+     */
     public String bookLookup(int isbn) {
-        return "Lookup Book Stub";
+        String title = "ISBN not found";
+        String edition = "unspecified";
+        String noCopies = "unspecified";
+        String copiesLeft = "unspecified";
+        String author = "";
+
+        try {
+            String search = "SELECT * FROM Book NATURAL JOIN Book_Author NATURAL JOIN AUTHOR " +
+                "WHERE isbn = " + isbn + " ORDER BY AuthorSeqNo ASC;";
+            Statement stmt = con.createStatement();
+            ResultSet rs = stmt.executeQuery(search);
+
+            while (rs.next()) {
+                title = rs.getString("Title");
+                edition = rs.getString("edition_no");
+                noCopies = rs.getString("numofcop");
+                copiesLeft = rs.getString("numleft");
+                author += rs.getString("surname") + ",";
+            }
+
+            if (author.equals(""))
+                author = "unspecified";
+
+            con.setAutoCommit(true);
+            stmt.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return isbn + ": " + title + "\nEdition: " + edition + "\nNumber of copies: " +
+                noCopies +"\nCopies left: " + copiesLeft + "\nAuthors: " + author ;
     }
 
     public String showCatalogue() {
