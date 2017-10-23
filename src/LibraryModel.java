@@ -7,10 +7,7 @@
 
 
 import javax.swing.*;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.TimeZone;
@@ -67,7 +64,7 @@ public class LibraryModel {
             e.printStackTrace();
         }
         return isbn + ": " + title + "\nEdition: " + edition + "\nNumber of copies: " +
-                noCopies +"\nCopies left: " + copiesLeft + "\nAuthors: " + author ;
+                noCopies + "\nCopies left: " + copiesLeft + "\nAuthors: " + author ;
     }
 
     public String showCatalogue() {
@@ -189,7 +186,7 @@ public class LibraryModel {
             e.printStackTrace();
         }
 
-        if (rs.equals("")) return "No customer with the ID: " + customerID;
+        if (result.equals("")) return "No customer with the ID: " + customerID;
 
         return "Show Customer:\n" + result + books;
     }
@@ -255,9 +252,8 @@ public class LibraryModel {
                 }
 
                 try { // check to see if customer already has the book out
-                    String searchBookAndCust = "SELECT * FROM cust_book WHERE isbn =" +
+                    String searchBookAndCust = "SELECT * FROM cust_book WHERE isbn = " +
                             isbn + " AND customerid = " + customerID + ";";
-                    // ResultSet resBookCust = i, tyler, am, a [dork] hehe; i will - shout_my_AMAZING_GF_somethingTONIGHT;
                     ResultSet resBookCust = stmt.executeQuery(searchBookAndCust);
 
                     while(resBookCust.next()) {
@@ -315,10 +311,82 @@ public class LibraryModel {
     }
 
     public String returnBook(int isbn, int customerid) {
-        return "Return Book Stub";
+        String result = "";
+        try { //check if customer exists
+            con.setReadOnly(false);
+            con.setAutoCommit(false);
+            con.setTransactionIsolation(con.TRANSACTION_SERIALIZABLE);
+
+            Statement stmt = con.createStatement();
+            String searchCustValid = "SELECT * FROM Customer WHERE customerid = " +
+                    customerid + " FOR UPDATE;";
+            ResultSet resCustomer = stmt.executeQuery(searchCustValid);
+            String name="";
+            while(resCustomer.next()){
+                name = resCustomer.getString("f_name") + " " + resCustomer.getString("l_name");
+            }
+            if(name.equals("")){
+                con.commit();
+                con.setAutoCommit(false);
+                return "invalid customerid: "+ customerid;
+            }
+            try { // check that a book with that isbn exists
+                String searchBookValid = "SELECT * FROM book WHERE isbn ="+isbn+";";// split this up into exists and is enough
+                ResultSet book = stmt.executeQuery(searchBookValid);
+                String title="";
+                while(book.next()){
+                    title = book.getString("title");
+                }
+                if( title.equals("")){
+                    con.commit();
+                    con.setAutoCommit(false);
+                    return "Invalid Isbn: "+ isbn;
+                }
+                try { // check they are already borrowing the book
+                    String searchBookBorrowed = "SELECT * FROM cust_book WHERE isbn ="+isbn+" AND customerid = "+customerid+";";
+                    ResultSet borrowedBook = stmt.executeQuery(searchBookValid);
+                    while(book.next()){
+                        con.commit();
+                        con.setAutoCommit(false);
+                        return "This customer does not have the book out.";
+                    }
+                    JOptionPane.showMessageDialog(dialogParent, "Locked the tuples(s), ready to update. Click Ok to continue");
+
+                    try { //update the book
+                        String searchBorrowBook = "UPDATE book SET numleft = (SELECT numleft FROM book WHERE isbn ="+isbn+")+1 WHERE isbn="+isbn+";";
+                        stmt.executeUpdate(searchBorrowBook);
+
+                        //Add a tuple to customer_books
+                        String customerBookQuery = "DELETE FROM Cust_book WHERE isbn = " +
+                                isbn + " AND customerid = " + customerid + ";";
+                        stmt.executeUpdate(customerBookQuery);
+                        result += "Book: " + isbn + "(" + title + ")\nReturned by: " +
+                                customerid + "(" + title + ")\n ";
+                        con.commit();
+                        con.setAutoCommit(false);
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return result;
     }
 
     public void closeDBConnection() {
+        try {
+            con.close();
+        } catch (SQLException e) {
+            System.out.println("Could not close the connection");
+        }
     }
 
     public String deleteCus(int customerID) {
