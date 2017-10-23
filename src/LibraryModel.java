@@ -68,27 +68,147 @@ public class LibraryModel {
     }
 
     public String showCatalogue() {
-        return "Show Catalogue Stub";
+        String result = "";
+
+        try {
+            // con.setAutoCommit(false);
+            String search = "SELECT isbn FROM book ORDER BY isbn ASC;";
+            Statement stmt = con.createStatement();
+            ResultSet rs = stmt.executeQuery(search);
+
+            while(rs.next()) {
+                int isbn = rs.getInt("isbn");
+                result += "\n\n" + bookLookup(isbn);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return result;
     }
 
     public String showLoanedBooks() {
-        return "Show Loaned Books Stub";
+        String result = "";
+
+        try {
+            // con.setReadOnly(true);
+            String search = "SELECT * FROM Book WHERE numofcop > numLeft ORDER BY isbn ASC;";
+            Statement stmt = con.createStatement();
+            ResultSet rs = stmt.executeQuery(search);
+
+            while(rs.next()) {
+                int isbn = rs.getInt("isbn");
+                result += bookLookup(isbn) + "\n"; // find a way to show amount loaned
+            }
+
+            con.setAutoCommit(true);
+            stmt.close();
+
+            if (result.equals("")) result = "No books on loan";
+
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+        return result;
     }
 
     public String showAuthor(int authorID) {
-        return "Show Author Stub";
+        String result = "";
+        String books = "";
+
+        try {
+            // con.setReadOnly(true);
+            String search = "SELECT * FROM Book NATURAL JOIN Book_Author NATURAL JOIN AUTHOR " +
+                    "WHERE AuthorId = " + authorID +
+                    "ORDER BY AuthorSeqNo ASC;";
+            Statement stmt = con.createStatement();
+            ResultSet rs = stmt.executeQuery(search);
+
+            while(rs.next()) {
+                if (result.equals("")) result = authorID + " - " +
+                        rs.getString("name") + " " +
+                        rs.getString("surname");
+                books += rs.getInt("isbn") + ", " + rs.getString("title") + "\n";
+            }
+            // con.setAutoCommit(true);
+            stmt.close();
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+
+        return "Show Author: " + result + "\n" + books;
     }
 
     public String showAllAuthors() {
-        return "Show All Authors Stub";
+        String result = "";
+
+        try {
+            String search = "SELECT * FROM author;";
+            Statement stmt = con.createStatement();
+            ResultSet rs = stmt.executeQuery(search);
+
+            while(rs.next()) {
+                result += rs.getInt("AuthorId") + ": " + rs.getString("name") + rs.getString("surname");
+            }
+
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+
+        return "Show All Authors\n" + result;
     }
 
+    // Dont forget to check if there are no customers with that ID
     public String showCustomer(int customerID) {
-        return "Show Customer Stub";
+        String result = "";
+        String books = "";
+        try {
+            // con.setReadOnly(true);
+            // con.setAutoCommit(false);
+            String search = "SELECT * FROM customer WHERE customerID = " + customerID + ";";
+            Statement stmt = con.createStatement();
+            ResultSet rs = stmt.executeQuery(search);
+
+            while(rs.next()) {
+                result += customerID + ", " + rs.getString("f_name") + " " +
+                        rs.getString("l_name") + ", " + rs.getString("city");
+            }
+
+            // Start the second part of the search
+            search = "SELECT * FROM Cust_book NATURAL JOIN book " +
+                    "WHERE customerId = " + customerID + ";";
+            rs = stmt.executeQuery(search);
+
+            while(rs.next()) {
+                books += "\n\t" + rs.getInt("isbn") + ", " + rs.getString("title");
+            }
+            stmt.close();
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+
+        if (rs.equals("")) return "No customer with the ID: " + customerID;
+
+        return "Show Customer:\n" + result + books;
     }
 
     public String showAllCustomers() {
-        return "Show All Customers Stub";
+        String result = "";
+
+        try {
+            // con.setReadOnly(true);
+            String search = "SELECT * FROM customer";
+            Statement stmt = con.createStatement();
+            ResultSet rs = stmt.executeQuery(search);
+
+            result += rs.getInt("customerid")+ ", " + rs.getString("f_name") +
+                    " " + rs.getString("l_name") +
+                    ", " + rs.getString("city") + " \n ";
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return "Show All Customers:\n" + result;
     }
 
     public String borrowBook(int isbn, int customerID,
