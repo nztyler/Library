@@ -48,7 +48,7 @@ public class LibraryModel {
             ResultSet rs = stmt.executeQuery(search);
 
             while (rs.next()) {
-                title = rs.getString("Title");
+                title = rs.getString("title");
                 edition = rs.getString("edition_no");
                 noCopies = rs.getString("numofcop");
                 copiesLeft = rs.getString("numleft");
@@ -117,8 +117,8 @@ public class LibraryModel {
 
         try {
             // con.setReadOnly(true);
-            String search = "SELECT * FROM Book NATURAL JOIN Book_Author NATURAL JOIN AUTHOR " +
-                    "WHERE AuthorId = " + authorID +
+            String search = "SELECT * FROM Book NATURAL JOIN Book_Author NATURAL JOIN Author " +
+                    "WHERE AuthorId = " + authorID + " " +
                     "ORDER BY AuthorSeqNo ASC;";
             Statement stmt = con.createStatement();
             ResultSet rs = stmt.executeQuery(search);
@@ -135,7 +135,7 @@ public class LibraryModel {
             e.printStackTrace();
         }
 
-        return "Show Author: " + result + "\n" + books;
+        return "Show Author:\n" + result + "\n" + books;
     }
 
     public String showAllAuthors() {
@@ -147,7 +147,8 @@ public class LibraryModel {
             ResultSet rs = stmt.executeQuery(search);
 
             while(rs.next()) {
-                result += rs.getInt("AuthorId") + ": " + rs.getString("name") + rs.getString("surname");
+                result += rs.getInt("AuthorId") + " - " + rs.getString("name") +
+                        rs.getString("surname") + "\n";
             }
 
         } catch(Exception e) {
@@ -157,7 +158,6 @@ public class LibraryModel {
         return "Show All Authors\n" + result;
     }
 
-    // Dont forget to check if there are no customers with that ID
     public String showCustomer(int customerID) {
         String result = "";
         String books = "";
@@ -173,6 +173,9 @@ public class LibraryModel {
                         rs.getString("l_name") + ", " + rs.getString("city");
             }
 
+            // if there's no-one with this ID, return
+            if (result.equals("")) return "No customer with the ID: " + customerID;
+
             // Start the second part of the search
             search = "SELECT * FROM Cust_book NATURAL JOIN book " +
                     "WHERE customerId = " + customerID + ";";
@@ -185,8 +188,6 @@ public class LibraryModel {
         } catch(Exception e) {
             e.printStackTrace();
         }
-
-        if (result.equals("")) return "No customer with the ID: " + customerID;
 
         return "Show Customer:\n" + result + books;
     }
@@ -273,28 +274,27 @@ public class LibraryModel {
                         if(bookTitle.equals("")) {
                             con.commit();
                             con.setAutoCommit(false);
-                            return "There are no copies availible";
+                            return "There are no copies available";
                         }
 
                         // Maybe I don't need this
                         JOptionPane.showMessageDialog(dialogParent, "Locked the tuples(s), ready to update. Click Ok to continue");
 
                         try {
-                            String searchBorrowBook = "UPDATE book SET numleft = (SELECT numleft FROM book WHERE isbn =" +
+                            String searchBorrowBook = "UPDATE book SET numleft = (SELECT numleft FROM book WHERE isbn = " +
                                     isbn + ")-1 WHERE isbn=" + isbn + ";";
                             stmt.executeUpdate(searchBorrowBook);
                             String customerBookQuery = "INSERT INTO Cust_book VALUES(" + isbn + "," +
                                     "'" + year + "-" + month + "-" + day + "'" + "," + customerID + ");";
                             stmt.executeUpdate(customerBookQuery);
 
-                            result += "Book: " + isbn + "(" + title + ")\n    Loaned to: " + customerID +
-                                    "(" + title + ")\nDue Date: " + day + " " + month + " " + year;
+                            result += "Book: " + isbn + ", " + title + "\nLoaned to: " + customerID +
+                                    "\nDue Date: " + day + "/" + month + "/" + year;
                             con.commit();
                             con.setAutoCommit(false);
                         } catch(Exception e) {
                             e.printStackTrace(); // update the book
                         }
-
                     } catch(Exception e) {
                         e.printStackTrace(); // check to see if there's a book available
                     }
@@ -312,7 +312,8 @@ public class LibraryModel {
 
     public String returnBook(int isbn, int customerid) {
         String result = "";
-        try { //check if customer exists
+
+        try { // check if customer exists
             con.setReadOnly(false);
             con.setAutoCommit(false);
             con.setTransactionIsolation(con.TRANSACTION_SERIALIZABLE);
@@ -328,10 +329,10 @@ public class LibraryModel {
             if(name.equals("")){
                 con.commit();
                 con.setAutoCommit(false);
-                return "invalid customerid: "+ customerid;
+                return "Invalid CustomerID: " + customerid;
             }
             try { // check that a book with that isbn exists
-                String searchBookValid = "SELECT * FROM book WHERE isbn ="+isbn+";";// split this up into exists and is enough
+                String searchBookValid = "SELECT * FROM book WHERE isbn = " + isbn + ";";
                 ResultSet book = stmt.executeQuery(searchBookValid);
                 String title="";
                 while(book.next()){
@@ -343,25 +344,26 @@ public class LibraryModel {
                     return "Invalid Isbn: "+ isbn;
                 }
                 try { // check they are already borrowing the book
-                    String searchBookBorrowed = "SELECT * FROM cust_book WHERE isbn ="+isbn+" AND customerid = "+customerid+";";
-                    ResultSet borrowedBook = stmt.executeQuery(searchBookValid);
-                    while(book.next()){
+                    String searchBookBorrowed = "SELECT * FROM cust_book WHERE isbn = " + isbn +
+                            " AND customerid = " + customerid + ";";
+                    ResultSet borrowedBook = stmt.executeQuery(searchBookBorrowed);
+                    while(borrowedBook.next()){
                         con.commit();
                         con.setAutoCommit(false);
                         return "This customer does not have the book out.";
                     }
                     JOptionPane.showMessageDialog(dialogParent, "Locked the tuples(s), ready to update. Click Ok to continue");
 
-                    try { //update the book
-                        String searchBorrowBook = "UPDATE book SET numleft = (SELECT numleft FROM book WHERE isbn ="+isbn+")+1 WHERE isbn="+isbn+";";
+                    try { // update the book
+                        String searchBorrowBook = "UPDATE book SET numleft = (SELECT numleft FROM book WHERE isbn = " +
+                                isbn + ")+1 WHERE isbn = " + isbn + ";";
                         stmt.executeUpdate(searchBorrowBook);
 
-                        //Add a tuple to customer_books
+                        // update tuple to customer_books
                         String customerBookQuery = "DELETE FROM Cust_book WHERE isbn = " +
                                 isbn + " AND customerid = " + customerid + ";";
                         stmt.executeUpdate(customerBookQuery);
-                        result += "Book: " + isbn + "(" + title + ")\nReturned by: " +
-                                customerid + "(" + title + ")\n ";
+                        result += "Book: " + isbn + ", " + title + "\nReturned by: " + customerid + "\n";
                         con.commit();
                         con.setAutoCommit(false);
 
@@ -377,7 +379,7 @@ public class LibraryModel {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
+        // do I rollback if I fail?
         return result;
     }
 
@@ -385,7 +387,7 @@ public class LibraryModel {
         try {
             con.close();
         } catch (SQLException e) {
-            System.out.println("Could not close the connection");
+            System.out.println("Close Connection - ERROR");
         }
     }
 
